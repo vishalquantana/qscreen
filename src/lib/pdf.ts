@@ -1,10 +1,9 @@
-import { PDFParse } from "pdf-parse";
+import pdf from "pdf-parse/lib/pdf-parse.js";
 
-export async function extractTextFromPdf(buffer: Buffer): Promise<string> {
+export async function extractTextFromPdf(buffer: Buffer | Uint8Array): Promise<string> {
   try {
-    const parser = new PDFParse({ data: buffer, verbosity: 0 });
-    const result = await parser.getText();
-    const text = result.text.trim();
+    const data = await pdf(Buffer.from(buffer));
+    const text = data.text.trim();
 
     if (!text) {
       throw new Error("PDF contains no extractable text");
@@ -15,6 +14,7 @@ export async function extractTextFromPdf(buffer: Buffer): Promise<string> {
     if (error instanceof Error && error.message === "PDF contains no extractable text") {
       throw error;
     }
+    console.error("PDF parse error:", error);
     throw new Error("Failed to parse PDF");
   }
 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { candidates, interviews } from "@/db/schema";
 import { extractTextFromPdf } from "@/lib/pdf";
+import { uploadCvToS3 } from "@/lib/s3";
 import { uploadCvSchema } from "@/types";
 
 export async function POST(request: Request) {
@@ -30,8 +31,12 @@ export async function POST(request: Request) {
       );
     }
 
-    const buffer = Buffer.from(await cvFile.arrayBuffer());
-    const cvText = await extractTextFromPdf(buffer);
+    const arrayBuffer = await cvFile.arrayBuffer();
+    const uint8 = new Uint8Array(arrayBuffer);
+    const cvText = await extractTextFromPdf(uint8);
+
+    // Upload PDF to S3
+    const cvFileUrl = await uploadCvToS3(Buffer.from(uint8), cvFile.name);
 
     const [candidate] = await db
       .insert(candidates)
@@ -40,6 +45,7 @@ export async function POST(request: Request) {
         email: validation.data.email,
         cvText,
         cvFileName: cvFile.name,
+        cvFileUrl,
       })
       .returning();
 

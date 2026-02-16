@@ -7,6 +7,7 @@ export const candidates = sqliteTable("candidates", {
   email: text("email").notNull(),
   cvText: text("cv_text").notNull(),
   cvFileName: text("cv_file_name").notNull(),
+  cvFileUrl: text("cv_file_url"),
   createdAt: text("created_at")
     .notNull()
     .default(sql`(datetime('now'))`),

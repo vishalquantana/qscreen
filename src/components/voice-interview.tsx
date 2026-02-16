@@ -29,7 +29,11 @@ export function VoiceInterview({
     },
     onError: (err) => {
       console.error("ElevenLabs error:", err);
-      setError("Voice connection error. Please try again.");
+      const message =
+        err && typeof err === "object" && "message" in err
+          ? (err as Error).message
+          : "Voice connection error. Please try again.";
+      setError(message);
       setStatus("idle");
     },
   });
@@ -47,7 +51,7 @@ export function VoiceInterview({
 
       const conversationId = await conversation.startSession({
         agentId,
-        connectionType: "webrtc",
+        connectionType: "websocket",
         overrides: {
           agent: {
             prompt: {
@@ -76,14 +80,21 @@ export function VoiceInterview({
     try {
       await conversation.endSession();
       setStatus("ended");
-      // Redirect to thank-you page after a brief delay
+
+      // Fetch transcript from ElevenLabs and run AI evaluation
+      await fetch("/api/complete-interview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ candidateId }),
+      });
+
       setTimeout(() => {
         window.location.href = "/thank-you";
-      }, 1500);
+      }, 2000);
     } catch {
       setStatus("ended");
     }
-  }, [conversation]);
+  }, [conversation, candidateId]);
 
   const handleTimeUp = useCallback(() => {
     endInterview();

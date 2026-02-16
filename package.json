@@ -17,6 +17,7 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.990.0",
     "@elevenlabs/react": "^0.14.0",
     "@google/generative-ai": "^0.24.1",
     "@libsql/client": "^0.17.0",
@@ -27,7 +28,8 @@
     "lucide-react": "^0.564.0",
     "next": "16.1.6",
     "next-themes": "^0.4.6",
-    "pdf-parse": "^2.4.5",
+    "pdf-parse": "^1.1.1",
+    "pdfkit": "^0.17.2",
     "radix-ui": "^1.4.3",
     "react": "19.2.3",
     "react-dom": "19.2.3",

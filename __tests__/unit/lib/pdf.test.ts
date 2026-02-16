@@ -1,12 +1,11 @@
 import { extractTextFromPdf } from "@/lib/pdf";
 
-const mockGetText = jest.fn();
+jest.mock("pdf-parse/lib/pdf-parse.js", () => {
+  return jest.fn();
+});
 
-jest.mock("pdf-parse", () => ({
-  PDFParse: jest.fn().mockImplementation(() => ({
-    getText: mockGetText,
-  })),
-}));
+import pdf from "pdf-parse/lib/pdf-parse.js";
+const mockPdf = pdf as jest.MockedFunction<typeof pdf>;
 
 describe("extractTextFromPdf", () => {
   beforeEach(() => {
@@ -15,24 +14,38 @@ describe("extractTextFromPdf", () => {
 
   it("should extract text from a valid PDF buffer", async () => {
     const mockText = "John Doe\nSoftware Engineer\n5 years experience with React";
-    mockGetText.mockResolvedValue({ text: mockText, pages: [] });
+    mockPdf.mockResolvedValue({
+      text: mockText,
+      numpages: 1,
+      numrender: 1,
+      info: {},
+      metadata: null,
+      version: "1.0",
+    } as Awaited<ReturnType<typeof pdf>>);
 
     const buffer = Buffer.from("fake-pdf-content");
     const result = await extractTextFromPdf(buffer);
 
     expect(result).toBe(mockText);
-    expect(mockGetText).toHaveBeenCalled();
+    expect(mockPdf).toHaveBeenCalled();
   });
 
   it("should throw an error for invalid PDF", async () => {
-    mockGetText.mockRejectedValue(new Error("Invalid PDF structure"));
+    mockPdf.mockRejectedValue(new Error("Invalid PDF structure"));
 
     const buffer = Buffer.from("not-a-pdf");
     await expect(extractTextFromPdf(buffer)).rejects.toThrow("Failed to parse PDF");
   });
 
   it("should throw an error for empty PDF text", async () => {
-    mockGetText.mockResolvedValue({ text: "   ", pages: [] });
+    mockPdf.mockResolvedValue({
+      text: "   ",
+      numpages: 0,
+      numrender: 0,
+      info: {},
+      metadata: null,
+      version: "1.0",
+    } as Awaited<ReturnType<typeof pdf>>);
 
     const buffer = Buffer.from("empty-pdf");
     await expect(extractTextFromPdf(buffer)).rejects.toThrow(
