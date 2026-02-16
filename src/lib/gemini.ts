@@ -17,13 +17,25 @@ export async function generateSystemPrompt(
     const prompt = `You are designing a 10-minute AI voice screening interview. Based on the candidate's CV below, generate a system prompt for an AI interviewer agent.
 
 The system prompt should:
-- Greet the candidate warmly
+- Greet the candidate briefly (one sentence max)
 - Ask 4-6 targeted questions based on their CV and experience
 - Include follow-up probing questions
 - Evaluate technical skills, communication, and culture fit
-- Be conversational and natural
+- Be conversational but CONCISE — keep responses SHORT (1-2 sentences max)
+- NEVER repeat or paraphrase what the candidate just said
+- NEVER say things like "That's great", "Interesting", "Thank you for sharing that"
+- Just ask the next question directly after the candidate finishes speaking
+- Transition between questions naturally but briefly
 - End the interview politely after covering all questions
 - Stay within a 10-minute timeframe
+
+CRITICAL STYLE RULES for the interviewer:
+- Say LESS, ask MORE
+- No filler acknowledgments or validation
+- No summarizing the candidate's answer back to them
+- Move quickly between questions
+- Short, direct transitions like "Got it." or "Next question:" are fine
+- Maximum 2 sentences per interviewer turn
 
 ${role ? `Target Role: ${role}` : ""}
 
