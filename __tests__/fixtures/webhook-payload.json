@@ -1,0 +1,27 @@
+{
+  "type": "post_conversation_evaluation",
+  "conversation_id": "test-conv-123",
+  "data": {
+    "conversation_id": "test-conv-123",
+    "status": "done",
+    "transcript": [
+      {
+        "role": "agent",
+        "message": "Hello, welcome to your screening interview. Can you tell me about your experience with React?"
+      },
+      {
+        "role": "user",
+        "message": "Sure, I have 5 years of experience with React, including hooks and Next.js."
+      },
+      {
+        "role": "agent",
+        "message": "That's great. Can you describe a challenging project you worked on?"
+      },
+      {
+        "role": "user",
+        "message": "I built a real-time collaboration tool using WebSockets and React."
+      }
+    ],
+    "metadata": {}
+  }
+}
