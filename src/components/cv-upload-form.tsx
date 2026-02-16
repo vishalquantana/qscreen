@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,35 +13,117 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
+type UploadPhase = "idle" | "uploading" | "processing" | "ready";
+
+function ProgressBar({ progress, phase }: { progress: number; phase: UploadPhase }) {
+  if (phase === "idle") return null;
+
+  const label =
+    phase === "uploading"
+      ? "Uploading CV..."
+      : phase === "processing"
+        ? "Processing your CV..."
+        : "Ready! Click Start when you're ready.";
+
+  return (
+    <div className="space-y-2">
+      <div className="flex justify-between text-sm text-muted-foreground">
+        <span>{label}</span>
+        <span>{Math.round(progress)}%</span>
+      </div>
+      <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+        <div
+          className="h-full rounded-full bg-primary transition-all duration-300 ease-out"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
 export function CvUploadForm() {
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
+  const [phase, setPhase] = useState<UploadPhase>("idle");
+  const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const resultRef = useRef<{ candidateId: number; accessToken: string } | null>(null);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setIsLoading(true);
+    setPhase("uploading");
+    setProgress(0);
     setError(null);
 
     const formData = new FormData(e.currentTarget);
 
     try {
-      const response = await fetch("/api/upload-cv", {
-        method: "POST",
-        body: formData,
+      // Use XMLHttpRequest for upload progress tracking
+      const result = await new Promise<{ candidateId: number; accessToken: string }>(
+        (resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+
+          xhr.upload.addEventListener("progress", (event) => {
+            if (event.lengthComputable) {
+              // Upload is 0-60% of the progress bar
+              const pct = (event.loaded / event.total) * 60;
+              setProgress(pct);
+            }
+          });
+
+          xhr.addEventListener("load", () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              try {
+                const data = JSON.parse(xhr.responseText);
+                resolve(data);
+              } catch {
+                reject(new Error("Invalid server response"));
+              }
+            } else {
+              try {
+                const data = JSON.parse(xhr.responseText);
+                reject(new Error(data.error || "Upload failed"));
+              } catch {
+                reject(new Error("Upload failed"));
+              }
+            }
+          });
+
+          xhr.addEventListener("error", () => reject(new Error("Network error")));
+          xhr.open("POST", "/api/upload-cv");
+          xhr.send(formData);
+        }
+      );
+
+      // Upload complete — now simulate processing phase (60% -> 100%)
+      setPhase("processing");
+      setProgress(60);
+
+      await new Promise<void>((resolve) => {
+        let p = 60;
+        const interval = setInterval(() => {
+          p += 2;
+          setProgress(Math.min(p, 100));
+          if (p >= 100) {
+            clearInterval(interval);
+            resolve();
+          }
+        }, 50); // 2% every 50ms = ~2 seconds total
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Upload failed");
-      }
-
-      router.push(`/interview/${data.candidateId}?token=${data.accessToken}`);
+      resultRef.current = result;
+      setPhase("ready");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setIsLoading(false);
+      setPhase("idle");
+      setProgress(0);
+    }
+  }
+
+  function handleStart() {
+    if (resultRef.current) {
+      router.push(
+        `/interview/${resultRef.current.candidateId}?token=${resultRef.current.accessToken}`
+      );
     }
   }
 
@@ -62,6 +144,7 @@ export function CvUploadForm() {
               name="name"
               placeholder="John Doe"
               required
+              disabled={phase !== "idle"}
             />
           </div>
           <div className="space-y-2">
@@ -72,6 +155,7 @@ export function CvUploadForm() {
               type="email"
               placeholder="john@example.com"
               required
+              disabled={phase !== "idle"}
             />
           </div>
           <div className="space-y-2">
@@ -82,16 +166,39 @@ export function CvUploadForm() {
               type="file"
               accept=".pdf,application/pdf"
               required
+              disabled={phase !== "idle"}
             />
           </div>
+
+          <ProgressBar progress={progress} phase={phase} />
+
           {error && (
             <p className="text-sm text-destructive" role="alert">
               {error}
             </p>
           )}
-          <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? "Uploading..." : "Upload & Start Interview"}
-          </Button>
+
+          {phase === "ready" ? (
+            <Button
+              type="button"
+              className="w-full"
+              onClick={handleStart}
+            >
+              Start Interview
+            </Button>
+          ) : (
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={phase !== "idle"}
+            >
+              {phase === "idle"
+                ? "Upload & Start Interview"
+                : phase === "uploading"
+                  ? "Uploading..."
+                  : "Processing..."}
+            </Button>
+          )}
         </form>
       </CardContent>
     </Card>
