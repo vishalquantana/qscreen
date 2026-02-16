@@ -1,9 +1,10 @@
-import pdf from "pdf-parse";
+import { PDFParse } from "pdf-parse";
 
 export async function extractTextFromPdf(buffer: Buffer): Promise<string> {
   try {
-    const data = await pdf(buffer);
-    const text = data.text.trim();
+    const parser = new PDFParse({ data: buffer, verbosity: 0 });
+    const result = await parser.getText();
+    const text = result.text.trim();
 
     if (!text) {
       throw new Error("PDF contains no extractable text");

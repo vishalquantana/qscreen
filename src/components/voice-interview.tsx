@@ -47,6 +47,7 @@ export function VoiceInterview({
 
       const conversationId = await conversation.startSession({
         agentId,
+        connectionType: "webrtc",
         overrides: {
           agent: {
             prompt: {
