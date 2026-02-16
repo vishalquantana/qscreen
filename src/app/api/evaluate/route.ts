@@ -3,12 +3,23 @@ import { db } from "@/db";
 import { candidates, interviews } from "@/db/schema";
 import { evaluateCandidate } from "@/lib/gemini";
 import { eq } from "drizzle-orm";
+import { checkRateLimit, getRateLimitHeaders } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
   try {
+    // Rate limit: 10 evaluations per 15 minutes per IP
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    const rl = checkRateLimit(`evaluate:${ip}`, { maxRequests: 10, windowSec: 900 });
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        { status: 429, headers: getRateLimitHeaders(rl) }
+      );
+    }
+
     const { interviewId } = await request.json();
 
-    if (!interviewId) {
+    if (!interviewId || typeof interviewId !== "number") {
       return NextResponse.json(
         { error: "interviewId is required" },
         { status: 400 }

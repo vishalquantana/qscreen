@@ -37,7 +37,7 @@ export function CvUploadForm() {
         throw new Error(data.error || "Upload failed");
       }
 
-      router.push(`/interview/${data.candidateId}`);
+      router.push(`/interview/${data.candidateId}?token=${data.accessToken}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {

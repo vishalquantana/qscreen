@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.990.0",
+    "@aws-sdk/s3-request-presigner": "^3.990.0",
     "@elevenlabs/react": "^0.14.0",
     "@google/generative-ai": "^0.24.1",
     "@libsql/client": "^0.17.0",

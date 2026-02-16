@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { candidates, interviews } from "@/db/schema";
 import { evaluateCandidate } from "@/lib/gemini";
 import { eq } from "drizzle-orm";
+import { checkRateLimit, getRateLimitHeaders } from "@/lib/rate-limit";
 
 interface ElevenLabsTranscriptEntry {
   role: "agent" | "user";
@@ -52,9 +53,19 @@ function formatTranscript(transcript: ElevenLabsTranscriptEntry[]): string {
 
 export async function POST(request: Request) {
   try {
+    // Rate limit: 5 completions per 15 minutes per IP (expensive operation)
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    const rl = checkRateLimit(`complete:${ip}`, { maxRequests: 5, windowSec: 900 });
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        { status: 429, headers: getRateLimitHeaders(rl) }
+      );
+    }
+
     const { candidateId } = await request.json();
 
-    if (!candidateId) {
+    if (!candidateId || typeof candidateId !== "number") {
       return NextResponse.json(
         { error: "candidateId is required" },
         { status: 400 }
@@ -140,8 +151,9 @@ export async function POST(request: Request) {
     }
   } catch (error) {
     console.error("Complete interview error:", error);
-    const message =
-      error instanceof Error ? error.message : "Failed to complete interview";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to complete interview. Please try again." },
+      { status: 500 }
+    );
   }
 }

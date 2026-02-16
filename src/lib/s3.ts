@@ -1,4 +1,9 @@
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+} from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import crypto from "crypto";
 
 const s3 = new S3Client({
@@ -19,7 +24,9 @@ export async function uploadCvToS3(
 ): Promise<string> {
   const suffix = crypto.randomBytes(8).toString("hex");
   const ext = originalFileName.split(".").pop() || "pdf";
-  const baseName = originalFileName.replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9_-]/g, "_");
+  const baseName = originalFileName
+    .replace(/\.[^.]+$/, "")
+    .replace(/[^a-zA-Z0-9_-]/g, "_");
   const key = `cvs/${baseName}_${suffix}.${ext}`;
 
   await s3.send(
@@ -28,10 +35,18 @@ export async function uploadCvToS3(
       Key: key,
       Body: Buffer.from(buffer),
       ContentType: "application/pdf",
-      ACL: "public-read",
     })
   );
 
-  const endpoint = process.env.AWS_S3_ENDPOINT!;
-  return `${endpoint}/${BUCKET}/${key}`;
+  // Return the S3 key (not public URL) — use getPresignedCvUrl to get a temporary URL
+  return key;
+}
+
+export async function getPresignedCvUrl(s3Key: string): Promise<string> {
+  const command = new GetObjectCommand({
+    Bucket: BUCKET,
+    Key: s3Key,
+  });
+  // URL expires in 1 hour
+  return getSignedUrl(s3, command, { expiresIn: 3600 });
 }

@@ -1,25 +1,33 @@
 import { db } from "@/db";
 import { candidates, interviews } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { InterviewClient } from "./interview-client";
 
 interface InterviewPageProps {
   params: Promise<{ candidateId: string }>;
+  searchParams: Promise<{ token?: string }>;
 }
 
-export default async function InterviewPage({ params }: InterviewPageProps) {
+export default async function InterviewPage({
+  params,
+  searchParams,
+}: InterviewPageProps) {
   const { candidateId: candidateIdStr } = await params;
+  const { token } = await searchParams;
   const candidateId = parseInt(candidateIdStr, 10);
 
-  if (isNaN(candidateId)) {
+  if (isNaN(candidateId) || !token) {
     notFound();
   }
 
+  // Validate access token to prevent IDOR
   const candidateRows = await db
     .select()
     .from(candidates)
-    .where(eq(candidates.id, candidateId));
+    .where(
+      and(eq(candidates.id, candidateId), eq(candidates.accessToken, token))
+    );
 
   if (candidateRows.length === 0) {
     notFound();

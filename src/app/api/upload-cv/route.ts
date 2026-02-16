@@ -1,12 +1,40 @@
 import { NextResponse } from "next/server";
+import crypto from "crypto";
 import { db } from "@/db";
 import { candidates, interviews } from "@/db/schema";
 import { extractTextFromPdf } from "@/lib/pdf";
 import { uploadCvToS3 } from "@/lib/s3";
 import { uploadCvSchema } from "@/types";
+import { checkRateLimit, getRateLimitHeaders } from "@/lib/rate-limit";
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const PDF_MAGIC_BYTES = [0x25, 0x50, 0x44, 0x46]; // %PDF
+
+function isPdf(buffer: Uint8Array): boolean {
+  if (buffer.length < 4) return false;
+  return PDF_MAGIC_BYTES.every((byte, i) => buffer[i] === byte);
+}
 
 export async function POST(request: Request) {
   try {
+    // Rate limit: 10 uploads per 15 minutes per IP
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    const rl = checkRateLimit(`upload:${ip}`, { maxRequests: 10, windowSec: 900 });
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Too many uploads. Please try again later." },
+        { status: 429, headers: getRateLimitHeaders(rl) }
+      );
+    }
+
+    const contentLength = request.headers.get("content-length");
+    if (contentLength && parseInt(contentLength) > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { error: "File too large. Maximum size is 10MB." },
+        { status: 413 }
+      );
+    }
+
     const formData = await request.formData();
     const name = formData.get("name") as string;
     const email = formData.get("email") as string;
@@ -16,10 +44,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "CV file is required" }, { status: 400 });
     }
 
-    if (!cvFile.type.includes("pdf")) {
+    if (cvFile.size > MAX_FILE_SIZE) {
       return NextResponse.json(
-        { error: "Only PDF files are accepted" },
-        { status: 400 }
+        { error: "File too large. Maximum size is 10MB." },
+        { status: 413 }
       );
     }
 
@@ -33,10 +61,24 @@ export async function POST(request: Request) {
 
     const arrayBuffer = await cvFile.arrayBuffer();
     const uint8 = new Uint8Array(arrayBuffer);
+
+    // Validate PDF by magic bytes, not MIME type (which is client-controlled)
+    if (!isPdf(uint8)) {
+      return NextResponse.json(
+        { error: "Only PDF files are accepted" },
+        { status: 400 }
+      );
+    }
+
     const cvText = await extractTextFromPdf(uint8);
 
+    // Sanitize filename for S3 key
+    const safeFileName = cvFile.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 100);
+
     // Upload PDF to S3
-    const cvFileUrl = await uploadCvToS3(Buffer.from(uint8), cvFile.name);
+    const cvFileUrl = await uploadCvToS3(Buffer.from(uint8), safeFileName);
+
+    const accessToken = crypto.randomBytes(32).toString("hex");
 
     const [candidate] = await db
       .insert(candidates)
@@ -44,8 +86,9 @@ export async function POST(request: Request) {
         name: validation.data.name,
         email: validation.data.email,
         cvText,
-        cvFileName: cvFile.name,
+        cvFileName: safeFileName,
         cvFileUrl,
+        accessToken,
       })
       .returning();
 
@@ -60,11 +103,13 @@ export async function POST(request: Request) {
     return NextResponse.json({
       candidateId: candidate.id,
       interviewId: interview.id,
+      accessToken,
     });
   } catch (error) {
     console.error("Upload CV error:", error);
-    const message =
-      error instanceof Error ? error.message : "Failed to upload CV";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to process CV. Please try again." },
+      { status: 500 }
+    );
   }
 }

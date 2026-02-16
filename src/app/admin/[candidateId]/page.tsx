@@ -3,6 +3,7 @@ import { candidates, interviews } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { CandidateDetail } from "@/components/candidate-detail";
+import { getPresignedCvUrl } from "@/lib/s3";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -42,6 +43,16 @@ export default async function AdminCandidatePage({
     notFound();
   }
 
+  // Generate presigned URL for CV if stored in S3
+  let cvPresignedUrl: string | null = null;
+  if (candidate.cvFileUrl) {
+    try {
+      cvPresignedUrl = await getPresignedCvUrl(candidate.cvFileUrl);
+    } catch {
+      // Fall back to no preview if S3 is unavailable
+    }
+  }
+
   return (
     <div className="space-y-4">
       <Link
@@ -50,7 +61,11 @@ export default async function AdminCandidatePage({
       >
         &larr; Back to Candidates
       </Link>
-      <CandidateDetail candidate={candidate} interview={interview} />
+      <CandidateDetail
+        candidate={candidate}
+        interview={interview}
+        cvPresignedUrl={cvPresignedUrl}
+      />
     </div>
   );
 }

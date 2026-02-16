@@ -13,6 +13,7 @@ import type { EvaluationResult } from "@/types";
 interface CandidateDetailProps {
   candidate: Candidate;
   interview: Interview;
+  cvPresignedUrl?: string | null;
 }
 
 function ScoreRing({ score }: { score: number }) {
@@ -81,6 +82,7 @@ function TranscriptMessage({
 export function CandidateDetail({
   candidate,
   interview,
+  cvPresignedUrl,
 }: CandidateDetailProps) {
   let evaluation: EvaluationResult | null = null;
   try {
@@ -131,9 +133,9 @@ export function CandidateDetail({
             <CardTitle className="text-sm">CV - {candidate.cvFileName}</CardTitle>
           </CardHeader>
           <CardContent className="flex-1 p-0 min-h-0">
-            {candidate.cvFileUrl ? (
+            {cvPresignedUrl ? (
               <iframe
-                src={candidate.cvFileUrl}
+                src={cvPresignedUrl}
                 className="w-full h-full border-0 rounded-b-lg"
                 title="Candidate CV"
               />
