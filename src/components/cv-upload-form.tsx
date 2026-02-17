@@ -41,7 +41,11 @@ function ProgressBar({ progress, phase }: { progress: number; phase: UploadPhase
   );
 }
 
-export function CvUploadForm() {
+interface CvUploadFormProps {
+  jobId: number;
+}
+
+export function CvUploadForm({ jobId }: CvUploadFormProps) {
   const router = useRouter();
   const [phase, setPhase] = useState<UploadPhase>("idle");
   const [progress, setProgress] = useState(0);
@@ -55,6 +59,7 @@ export function CvUploadForm() {
     setError(null);
 
     const formData = new FormData(e.currentTarget);
+    formData.append("jobId", String(jobId));
 
     try {
       // Use XMLHttpRequest for upload progress tracking

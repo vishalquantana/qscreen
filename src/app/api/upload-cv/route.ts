@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { db } from "@/db";
-import { candidates, interviews } from "@/db/schema";
+import { candidates, interviews, jobs } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { extractTextFromPdf } from "@/lib/pdf";
 import { uploadCvToS3 } from "@/lib/s3";
 import { uploadCvSchema } from "@/types";
@@ -39,6 +40,25 @@ export async function POST(request: Request) {
     const name = formData.get("name") as string;
     const email = formData.get("email") as string;
     const cvFile = formData.get("cv") as File | null;
+    const jobIdStr = formData.get("jobId") as string;
+
+    if (!jobIdStr) {
+      return NextResponse.json({ error: "jobId is required" }, { status: 400 });
+    }
+
+    const jobId = parseInt(jobIdStr, 10);
+    if (isNaN(jobId)) {
+      return NextResponse.json({ error: "Invalid jobId" }, { status: 400 });
+    }
+
+    // Verify job exists and is open
+    const jobRows = await db.select().from(jobs).where(eq(jobs.id, jobId));
+    if (jobRows.length === 0 || jobRows[0].status !== "open") {
+      return NextResponse.json(
+        { error: "Job not found or no longer accepting applications" },
+        { status: 400 }
+      );
+    }
 
     if (!cvFile) {
       return NextResponse.json({ error: "CV file is required" }, { status: 400 });
@@ -89,6 +109,7 @@ export async function POST(request: Request) {
         cvFileName: safeFileName,
         cvFileUrl,
         accessToken,
+        jobId,
       })
       .returning();
 

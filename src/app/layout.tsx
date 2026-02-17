@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Skylark - GTM Manager Role",
+  title: "QScreen - AI Screening Interviews",
   description: "AI-powered voice screening interviews for candidates",
 };
 

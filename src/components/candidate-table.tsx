@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Table,
@@ -16,13 +17,16 @@ import type { Candidate, Interview } from "@/db/schema";
 
 interface CandidateWithInterview extends Candidate {
   interview: Interview | null;
+  jobTitle?: string;
 }
 
 interface CandidateTableProps {
   candidates: CandidateWithInterview[];
+  jobs?: { id: number; title: string }[];
+  activeJobId?: number;
 }
 
-type SortKey = "name" | "email" | "status" | "score" | "date";
+type SortKey = "name" | "email" | "job" | "status" | "score" | "date";
 type SortDir = "asc" | "desc";
 
 function StatusBadge({ status }: { status: string | null }) {
@@ -72,10 +76,11 @@ function formatDateTime(dateStr: string) {
 }
 
 function exportCsv(candidates: CandidateWithInterview[]) {
-  const headers = ["Name", "Email", "CV File", "Status", "Score", "Date"];
+  const headers = ["Name", "Email", "Job", "CV File", "Status", "Score", "Date"];
   const rows = candidates.map((c) => [
     c.name,
     c.email,
+    c.jobTitle || "",
     c.cvFileName,
     c.interview?.status || "No Interview",
     c.interview?.score != null ? String(c.interview.score) : "",
@@ -98,7 +103,8 @@ function exportCsv(candidates: CandidateWithInterview[]) {
   URL.revokeObjectURL(url);
 }
 
-export function CandidateTable({ candidates }: CandidateTableProps) {
+export function CandidateTable({ candidates, jobs, activeJobId }: CandidateTableProps) {
+  const router = useRouter();
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
@@ -108,6 +114,15 @@ export function CandidateTable({ candidates }: CandidateTableProps) {
     } else {
       setSortKey(key);
       setSortDir("asc");
+    }
+  }
+
+  function handleJobFilter(e: React.ChangeEvent<HTMLSelectElement>) {
+    const val = e.target.value;
+    if (val) {
+      router.push(`/admin?jobId=${val}`);
+    } else {
+      router.push("/admin");
     }
   }
 
@@ -121,6 +136,9 @@ export function CandidateTable({ candidates }: CandidateTableProps) {
           break;
         case "email":
           cmp = a.email.localeCompare(b.email);
+          break;
+        case "job":
+          cmp = (a.jobTitle || "").localeCompare(b.jobTitle || "");
           break;
         case "status": {
           const sa = a.interview?.status || "";
@@ -148,7 +166,23 @@ export function CandidateTable({ candidates }: CandidateTableProps) {
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between">
+        {jobs && jobs.length > 0 ? (
+          <select
+            className="rounded-md border px-3 py-1.5 text-sm bg-background"
+            value={activeJobId ?? ""}
+            onChange={handleJobFilter}
+          >
+            <option value="">All Jobs</option>
+            {jobs.map((job) => (
+              <option key={job.id} value={job.id}>
+                {job.title}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <div />
+        )}
         <Button
           variant="outline"
           size="sm"
@@ -164,6 +198,10 @@ export function CandidateTable({ candidates }: CandidateTableProps) {
             <TableHead className={thClass} onClick={() => handleSort("name")}>
               Name
               <SortIcon active={sortKey === "name"} dir={sortDir} />
+            </TableHead>
+            <TableHead className={thClass} onClick={() => handleSort("job")}>
+              Job
+              <SortIcon active={sortKey === "job"} dir={sortDir} />
             </TableHead>
             <TableHead className={thClass} onClick={() => handleSort("email")}>
               Email
@@ -188,7 +226,7 @@ export function CandidateTable({ candidates }: CandidateTableProps) {
           {sorted.length === 0 ? (
             <TableRow>
               <TableCell
-                colSpan={6}
+                colSpan={7}
                 className="text-center text-muted-foreground"
               >
                 No candidates yet
@@ -204,6 +242,9 @@ export function CandidateTable({ candidates }: CandidateTableProps) {
                   >
                     {candidate.name}
                   </Link>
+                </TableCell>
+                <TableCell className="text-sm">
+                  {candidate.jobTitle || "-"}
                 </TableCell>
                 <TableCell>{candidate.email}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">

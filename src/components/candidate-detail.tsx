@@ -14,6 +14,7 @@ interface CandidateDetailProps {
   candidate: Candidate;
   interview: Interview;
   cvPresignedUrl?: string | null;
+  jobTitle?: string;
 }
 
 function ScoreRing({ score }: { score: number }) {
@@ -83,6 +84,7 @@ export function CandidateDetail({
   candidate,
   interview,
   cvPresignedUrl,
+  jobTitle,
 }: CandidateDetailProps) {
   let evaluation: EvaluationResult | null = null;
   try {
@@ -114,6 +116,9 @@ export function CandidateDetail({
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">{candidate.name}</h1>
+          {jobTitle && (
+            <p className="text-sm font-medium text-muted-foreground">{jobTitle}</p>
+          )}
           <p className="text-muted-foreground">{candidate.email}</p>
         </div>
         <Badge

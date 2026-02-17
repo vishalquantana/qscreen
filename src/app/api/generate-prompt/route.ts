@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { candidates, interviews } from "@/db/schema";
+import { candidates, interviews, jobs } from "@/db/schema";
 import { generateSystemPrompt } from "@/lib/gemini";
 import { eq } from "drizzle-orm";
 import { checkRateLimit, getRateLimitHeaders } from "@/lib/rate-limit";
@@ -39,7 +39,18 @@ export async function POST(request: Request) {
     }
 
     const candidate = candidateRows[0];
-    const systemPrompt = await generateSystemPrompt(candidate.cvText);
+
+    // Fetch job context
+    let jobContext: { title: string; description: string; criteria: string } | undefined;
+    if (candidate.jobId) {
+      const jobRows = await db.select().from(jobs).where(eq(jobs.id, candidate.jobId));
+      if (jobRows.length > 0) {
+        const job = jobRows[0];
+        jobContext = { title: job.title, description: job.description, criteria: job.criteria };
+      }
+    }
+
+    const systemPrompt = await generateSystemPrompt(candidate.cvText, jobContext);
 
     // Update the interview with the system prompt
     await db

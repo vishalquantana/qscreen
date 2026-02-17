@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { candidates, interviews } from "@/db/schema";
+import { candidates, interviews, jobs } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { CandidateDetail } from "@/components/candidate-detail";
@@ -43,6 +43,16 @@ export default async function AdminCandidatePage({
     notFound();
   }
 
+  // Fetch job title
+  let jobTitle: string | undefined;
+  if (candidate.jobId) {
+    const jobRows = await db
+      .select({ title: jobs.title })
+      .from(jobs)
+      .where(eq(jobs.id, candidate.jobId));
+    jobTitle = jobRows[0]?.title;
+  }
+
   // Generate presigned URL for CV if stored in S3
   let cvPresignedUrl: string | null = null;
   if (candidate.cvFileUrl) {
@@ -65,6 +75,7 @@ export default async function AdminCandidatePage({
         candidate={candidate}
         interview={interview}
         cvPresignedUrl={cvPresignedUrl}
+        jobTitle={jobTitle}
       />
     </div>
   );

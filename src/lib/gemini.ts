@@ -8,12 +8,25 @@ function getModel() {
   return genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 }
 
+interface JobContext {
+  title: string;
+  description: string;
+  criteria: string;
+}
+
 export async function generateSystemPrompt(
   cvText: string,
-  role?: string
+  job?: JobContext
 ): Promise<string> {
   try {
     const model = getModel();
+
+    const jobSection = job
+      ? `Target Role: ${job.title}
+Job Description: ${job.description}
+Evaluation Criteria: ${job.criteria}`
+      : "";
+
     const prompt = `You are designing a 10-minute AI voice screening interview. Based on the candidate's CV below, generate a system prompt for an AI interviewer agent.
 
 The system prompt should:
@@ -37,7 +50,7 @@ CRITICAL STYLE RULES for the interviewer:
 - Short, direct transitions like "Got it." or "Next question:" are fine
 - Maximum 2 sentences per interviewer turn
 
-${role ? `Target Role: ${role}` : ""}
+${jobSection}
 
 Candidate CV:
 ${cvText}
@@ -53,12 +66,22 @@ Generate ONLY the system prompt text, no additional commentary.`;
 
 export async function evaluateCandidate(
   transcript: string,
-  cvText: string
+  cvText: string,
+  job?: JobContext
 ): Promise<EvaluationResult> {
   try {
     const model = getModel();
-    const prompt = `Evaluate this candidate's screening interview. Analyze their responses for technical competence, communication skills, problem-solving ability, and overall fit.
 
+    const jobSection = job
+      ? `\nTarget Role: ${job.title}
+Job Description: ${job.description}
+Evaluation Criteria: ${job.criteria}
+
+Evaluate the candidate specifically against the above criteria.\n`
+      : "";
+
+    const prompt = `Evaluate this candidate's screening interview. Analyze their responses for technical competence, communication skills, problem-solving ability, and overall fit.
+${jobSection}
 Candidate CV:
 ${cvText}
 

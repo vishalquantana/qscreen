@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { candidates, interviews } from "@/db/schema";
+import { candidates, interviews, jobs } from "@/db/schema";
 import { evaluateCandidate } from "@/lib/gemini";
 import { eq } from "drizzle-orm";
 import { checkRateLimit, getRateLimitHeaders } from "@/lib/rate-limit";
@@ -108,17 +108,28 @@ export async function POST(request: Request) {
       .set({ transcript: formattedTranscript, status: "in_progress" })
       .where(eq(interviews.id, interview.id));
 
-    // Get candidate CV for evaluation
+    // Get candidate CV and job context for evaluation
     const candidateRows = await db
       .select()
       .from(candidates)
       .where(eq(candidates.id, candidateId));
 
-    const cvText = candidateRows[0]?.cvText || "";
+    const candidate = candidateRows[0];
+    const cvText = candidate?.cvText || "";
+
+    // Fetch job context
+    let jobContext: { title: string; description: string; criteria: string } | undefined;
+    if (candidate?.jobId) {
+      const jobRows = await db.select().from(jobs).where(eq(jobs.id, candidate.jobId));
+      if (jobRows.length > 0) {
+        const job = jobRows[0];
+        jobContext = { title: job.title, description: job.description, criteria: job.criteria };
+      }
+    }
 
     // Run AI evaluation
     try {
-      const evaluation = await evaluateCandidate(formattedTranscript, cvText);
+      const evaluation = await evaluateCandidate(formattedTranscript, cvText, jobContext);
 
       await db
         .update(interviews)

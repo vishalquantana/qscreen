@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { candidates, interviews } from "@/db/schema";
+import { candidates, interviews, jobs } from "@/db/schema";
 import { evaluateCandidate } from "@/lib/gemini";
 import { eq } from "drizzle-orm";
 import { checkRateLimit, getRateLimitHeaders } from "@/lib/rate-limit";
@@ -47,15 +47,26 @@ export async function POST(request: Request) {
       );
     }
 
-    // Get candidate CV text
+    // Get candidate CV text and job context
     const candidateRows = await db
       .select()
       .from(candidates)
       .where(eq(candidates.id, interview.candidateId));
 
-    const cvText = candidateRows[0]?.cvText || "";
+    const candidate = candidateRows[0];
+    const cvText = candidate?.cvText || "";
 
-    const evaluation = await evaluateCandidate(interview.transcript, cvText);
+    // Fetch job context
+    let jobContext: { title: string; description: string; criteria: string } | undefined;
+    if (candidate?.jobId) {
+      const jobRows = await db.select().from(jobs).where(eq(jobs.id, candidate.jobId));
+      if (jobRows.length > 0) {
+        const job = jobRows[0];
+        jobContext = { title: job.title, description: job.description, criteria: job.criteria };
+      }
+    }
+
+    const evaluation = await evaluateCandidate(interview.transcript, cvText, jobContext);
 
     await db
       .update(interviews)
